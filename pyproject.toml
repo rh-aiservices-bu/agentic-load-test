@@ -1,0 +1,27 @@
+[project]
+name = "agentic-loadtest"
+version = "0.1.0"
+description = "Load-test tool that simulates multiple users running agentic applications against an OpenAI-compatible LLM, with simulated MCP-style tools and live metrics."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "openai==1.59.6",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.1",
+    "pyyaml==6.0.2",
+    "httpx==0.28.1",
+]
+
+[project.scripts]
+agentic-loadtest = "agentic_loadtest.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agentic_loadtest = ["static/*", "../config/**/*", "../fixtures/*"]

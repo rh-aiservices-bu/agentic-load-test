@@ -1,0 +1,22 @@
+{
+  "slack_search": {
+    "query": "{query}",
+    "matches": [
+      {"channel": "#project-atlas", "user": "@dana", "ts": "1717000001.0001", "thread_ts": "1717000001.0001", "text": "Kicking off Project Atlas. Goal: ship the new ingestion pipeline by end of quarter."},
+      {"channel": "#project-atlas", "user": "@raj", "ts": "1717000120.0002", "thread_ts": "1717000001.0001", "text": "Blocker: the staging cluster keeps OOMing on large batches. Investigating."},
+      {"channel": "#eng-announcements", "user": "@priya", "ts": "1717003000.0009", "text": "Reminder: code freeze for the Atlas milestone is Friday."},
+      {"channel": "#project-atlas", "user": "@dana", "ts": "1717004500.0011", "text": "Demo with the customer is scheduled for next Wednesday 2pm."}
+    ]
+  },
+  "slack_read_thread": {
+    "channel": "{channel}",
+    "thread_ts": "{thread_ts}",
+    "messages": [
+      {"user": "@dana", "text": "Kicking off Project Atlas. Goal: ship the new ingestion pipeline by end of quarter."},
+      {"user": "@raj", "text": "Blocker: staging cluster OOMs on large batches."},
+      {"user": "@mira", "text": "I increased the memory limits and added backpressure; batches up to 2M rows pass now."},
+      {"user": "@dana", "text": "Great. Remaining risks: customer demo data quality and the migration script."}
+    ]
+  },
+  "slack_post_message": {"ok": true, "channel": "{channel}", "ts": "1717009999.0042", "permalink": "https://example.slack.com/archives/C0ATLAS/p1717009999"}
+}

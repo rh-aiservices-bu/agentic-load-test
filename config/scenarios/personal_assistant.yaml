@@ -1,0 +1,20 @@
+name: personal_assistant
+description: OpenClaw-style personal assistant handling daily inbox/calendar/Slack chores.
+weight: 3
+persona: >
+  You are a proactive personal assistant. You help the user stay on top of their
+  inbox, calendar and team chatter. Use the available tools to gather real
+  information before answering, and keep the user informed in concise summaries.
+goal: >
+  Catch me up on what I missed this morning: summarise unread email, my Slack
+  mentions, and today's calendar, then flag anything that needs a reply today.
+tools:
+  - email_search
+  - slack_search
+  - slack_read_thread
+  - calendar_list_events
+  - email_send
+max_turns: 10
+follow_ups:
+  - "Draft a reply to the customer about the demo logistics and send it."
+  - "Add a 30-minute prep block before the demo to my calendar."

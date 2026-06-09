@@ -1,0 +1,17 @@
+{
+  "email_search": {
+    "query": "{query}",
+    "messages": [
+      {"id": "msg-501", "from": "customer@acme.example", "subject": "Atlas demo logistics", "snippet": "Can we confirm the agenda and attendees for the demo?"},
+      {"id": "msg-502", "from": "raj@corp.example", "subject": "Re: staging OOM", "snippet": "Memory limits bumped; please re-run the load test."}
+    ]
+  },
+  "email_send": {"status": "sent", "to": "{to}", "subject": "{subject}", "message_id": "msg-out-9931"},
+  "calendar_list_events": {
+    "events": [
+      {"title": "Atlas weekly sync", "start": "2026-06-10T15:00:00Z", "end": "2026-06-10T15:30:00Z"},
+      {"title": "Customer demo — Atlas", "start": "2026-06-11T14:00:00Z", "end": "2026-06-11T15:00:00Z"}
+    ]
+  },
+  "calendar_create_event": {"status": "created", "event_id": "evt-7781", "title": "{title}", "start": "{start}"}
+}

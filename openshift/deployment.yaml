@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentic-loadtest
+  labels: { app: agentic-loadtest }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: agentic-loadtest }
+  template:
+    metadata:
+      labels: { app: agentic-loadtest }
+    spec:
+      containers:
+        - name: app
+          image: image-registry.openshift-image-registry.svc:5000/agentic-loadtest/agentic-loadtest:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ALT_HOST
+              value: "0.0.0.0"
+            - name: ALT_PORT
+              value: "8080"
+            - name: ALT_CONFIG
+              value: "/app/config/config.example.yaml"
+            # Inject the model endpoint/token from a Secret rather than the image.
+            - name: ALT_LLM_API_KEY
+              valueFrom:
+                secretKeyRef: { name: agentic-loadtest-llm, key: api_key, optional: true }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "2", memory: "1Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+            seccompProfile: { type: RuntimeDefault }

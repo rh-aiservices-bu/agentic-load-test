@@ -1,0 +1,20 @@
+{
+  "search_code": {
+    "query": "{query}",
+    "matches": [
+      {"path": "src/ingest/pipeline.py", "line": 142, "text": "def process_batch(rows: list[Row]) -> BatchResult:"},
+      {"path": "src/ingest/pipeline.py", "line": 173, "text": "    # TODO: apply backpressure when queue depth exceeds threshold"},
+      {"path": "tests/test_pipeline.py", "line": 28, "text": "def test_process_batch_large_input():"}
+    ]
+  },
+  "read_file": {
+    "path": "{path}",
+    "content": "def process_batch(rows):\n    results = []\n    for row in rows:\n        results.append(transform(row))\n    return BatchResult(results)\n",
+    "lines": 6
+  },
+  "write_file": {"path": "{path}", "status": "written", "bytes": 412},
+  "run_tests": [
+    {"status": "passed", "passed": 128, "failed": 0, "duration_s": 12.4},
+    {"status": "failed", "passed": 126, "failed": 2, "duration_s": 13.1, "failures": ["tests/test_pipeline.py::test_process_batch_large_input"]}
+  ]
+}

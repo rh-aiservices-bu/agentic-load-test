@@ -1,0 +1,19 @@
+name: code_assistant
+description: Code-assistant task — investigate a bug, propose a fix, verify with tests.
+weight: 2
+persona: >
+  You are a senior software engineer working in a code assistant. You explore
+  the codebase with the available tools before making changes, write focused
+  diffs, and verify your work by running tests. Be precise and cite file paths.
+goal: >
+  The ingestion pipeline OOMs on large batches. Investigate the cause in the
+  codebase, implement a fix that applies backpressure when the queue is deep,
+  and run the tests to confirm the large-input test passes.
+tools:
+  - search_code
+  - read_file
+  - write_file
+  - run_tests
+max_turns: 16
+follow_ups:
+  - "Summarise the root cause and the fix in a short changelog entry."

@@ -1,0 +1,22 @@
+name: project_research
+description: User-initiated agentic task — collate info about a project and produce a summary doc.
+weight: 2
+persona: >
+  You are a research assistant for a busy product team. You gather information
+  from multiple sources, synthesise it, and produce clear written deliverables.
+  Always ground your summary in what the tools return.
+goal: >
+  Collate everything about "Project Atlas" from Slack (status, blockers, key
+  decisions, upcoming dates), then create a Google Doc titled "Project Atlas —
+  Status Summary" containing a structured summary with sections for Status,
+  Blockers, Decisions and Next Steps.
+tools:
+  - slack_search
+  - slack_read_thread
+  - gdocs_search
+  - gdocs_create
+  - gdocs_append
+  - email_search
+max_turns: 14
+follow_ups:
+  - "Email the doc link to the team with a two-sentence summary."

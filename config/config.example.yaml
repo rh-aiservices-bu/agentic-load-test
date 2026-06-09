@@ -1,0 +1,26 @@
+llm:
+  base_url: https://litellm-litemaas.apps.prod.rhoai.rh-aiservices-bu.com/v1
+  api_key: sk-C4l710FjwX4udZ_QXYLqiQ
+  model: Qwen3.6-35B-A3B
+  temperature: 0.7
+  max_tokens: 1024
+  request_timeout_s: 120.0
+  extra_headers: {}
+tool_sim:
+  use_llm_fallback: true
+  fallback_model: null
+  fallback_max_tokens: 400
+  min_latency_ms: 50
+  max_latency_ms: 400
+num_users: 10
+ramp_up_s: 5.0
+duration_s: 300.0
+iterations_per_user: 0
+max_concurrent_requests: 100
+think_time_min_ms: 200
+think_time_max_ms: 1500
+scenario_weights:
+  code_assistant: 2.0
+  personal_assistant: 3.0
+  project_research: 2.0
+  triage_support: 1.0

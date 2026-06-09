@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: agentic-loadtest
+  labels: { app: agentic-loadtest }
+spec:
+  to:
+    kind: Service
+    name: agentic-loadtest
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

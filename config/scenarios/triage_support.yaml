@@ -1,0 +1,17 @@
+name: triage_support
+description: Short, high-frequency assistant task — triage one incoming request. Cheap and fast.
+weight: 1
+persona: >
+  You are a support triage assistant. You quickly classify an incoming request,
+  pull any relevant context, and either resolve it or route it. Be brief.
+goal: >
+  A teammate asks in Slack why the staging load test is failing. Find the
+  relevant Slack context and recent emails, then post a short reply in the
+  channel with the likely cause and next step.
+tools:
+  - slack_search
+  - slack_read_thread
+  - email_search
+  - slack_post_message
+max_turns: 8
+follow_ups: []

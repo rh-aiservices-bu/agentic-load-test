@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agentic Load Test</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#0f1419; --panel:#1a212b; --panel2:#222c38; --fg:#e6edf3; --muted:#8b98a5;
+          --accent:#4493f8; --good:#3fb950; --bad:#f85149; --border:#30363d; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         background:var(--bg); color:var(--fg); }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex;
+           align-items:center; gap:14px; }
+  header h1 { font-size:17px; margin:0; font-weight:600; }
+  .pill { font-size:12px; padding:3px 10px; border-radius:20px; background:var(--panel2);
+          color:var(--muted); border:1px solid var(--border); }
+  .pill.running { color:var(--good); border-color:var(--good); }
+  .pill.finished { color:var(--accent); border-color:var(--accent); }
+  .layout { display:grid; grid-template-columns:340px 1fr; gap:16px; padding:16px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+              margin:0 0 12px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 3px; }
+  input, select, textarea { width:100%; background:var(--bg); border:1px solid var(--border);
+        color:var(--fg); border-radius:6px; padding:7px 9px; font:inherit; }
+  textarea { resize:vertical; min-height:54px; font-family:ui-monospace,monospace; font-size:12px; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  button { cursor:pointer; border:none; border-radius:6px; padding:9px 14px; font:inherit;
+           font-weight:600; }
+  .btn-start { background:var(--good); color:#03210c; }
+  .btn-stop { background:var(--bad); color:#2b0606; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .actions { display:flex; gap:8px; margin-top:16px; }
+  .actions > button { flex:1; }
+  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .card .v { font-size:24px; font-weight:700; }
+  .card .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  canvas { max-height:230px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .err { color:var(--bad); font-size:12px; margin-top:8px; min-height:16px; }
+  .scn-weights { display:grid; grid-template-columns:1fr 70px; gap:6px 8px; align-items:center; }
+  .scn-weights span { font-size:12px; }
+  .full { grid-column:1/-1; }
+  details summary { cursor:pointer; color:var(--muted); font-size:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Agentic Load Test</h1>
+  <span id="state" class="pill">idle</span>
+  <span id="elapsed" class="pill">0s</span>
+</header>
+
+<div class="layout">
+  <!-- ───────── Config panel ───────── -->
+  <div class="panel">
+    <h2>LLM connection</h2>
+    <label>Base URL (OpenAI-compatible)</label>
+    <input id="base_url" placeholder="https://api.openai.com/v1" />
+    <label>API key / token</label>
+    <input id="api_key" type="password" />
+    <label>Model</label>
+    <input id="model" placeholder="gpt-4o-mini" />
+    <div class="row">
+      <div><label>Temperature</label><input id="temperature" type="number" step="0.1" /></div>
+      <div><label>Max tokens</label><input id="max_tokens" type="number" /></div>
+    </div>
+
+    <h2 style="margin-top:18px">Load profile</h2>
+    <div class="row">
+      <div><label>Users</label><input id="num_users" type="number" /></div>
+      <div><label>Ramp-up (s)</label><input id="ramp_up_s" type="number" /></div>
+    </div>
+    <div class="row">
+      <div><label>Duration (s, 0=∞)</label><input id="duration_s" type="number" /></div>
+      <div><label>Iters/user (0=∞)</label><input id="iterations_per_user" type="number" /></div>
+    </div>
+    <div class="row">
+      <div><label>Max concurrent reqs</label><input id="max_concurrent_requests" type="number" /></div>
+    </div>
+    <div class="row">
+      <div><label>Think min (ms)</label><input id="think_time_min_ms" type="number" /></div>
+      <div><label>Think max (ms)</label><input id="think_time_max_ms" type="number" /></div>
+    </div>
+
+    <details>
+      <summary>Tool simulation</summary>
+      <label><input type="checkbox" id="use_llm_fallback" style="width:auto" /> LLM fallback for unknown tools</label>
+      <div class="row">
+        <div><label>Tool latency min (ms)</label><input id="min_latency_ms" type="number" /></div>
+        <div><label>Tool latency max (ms)</label><input id="max_latency_ms" type="number" /></div>
+      </div>
+    </details>
+
+    <h2 style="margin-top:18px">Scenario mix (weights)</h2>
+    <div id="scn-weights" class="scn-weights"></div>
+
+    <div class="actions">
+      <button id="btn-start" class="btn-start">Start</button>
+      <button id="btn-stop" class="btn-stop" disabled>Stop</button>
+    </div>
+    <div id="err" class="err"></div>
+  </div>
+
+  <!-- ───────── Metrics panel ───────── -->
+  <div>
+    <div class="cards">
+      <div class="card"><div class="v" id="c-users">0</div><div class="l">Active users</div></div>
+      <div class="card"><div class="v" id="c-tokens">0</div><div class="l">Total tokens</div></div>
+      <div class="card"><div class="v" id="c-tps">0</div><div class="l">Tokens / sec</div></div>
+      <div class="card"><div class="v" id="c-ttft">0</div><div class="l">TTFT p95 (s)</div></div>
+      <div class="card"><div class="v" id="c-reqs">0</div><div class="l">Requests OK</div></div>
+      <div class="card"><div class="v" id="c-fail">0</div><div class="l">Failed</div></div>
+      <div class="card"><div class="v" id="c-tools">0</div><div class="l">Tool calls</div></div>
+      <div class="card"><div class="v" id="c-lat">0</div><div class="l">Latency p95 (s)</div></div>
+    </div>
+
+    <div class="charts">
+      <div class="panel"><h2>Cumulative token usage</h2><canvas id="chart-tokens"></canvas></div>
+      <div class="panel"><h2>Throughput (tokens/s · reqs/s)</h2><canvas id="chart-rate"></canvas></div>
+      <div class="panel"><h2>TTFT (p50 / p95)</h2><canvas id="chart-ttft"></canvas></div>
+      <div class="panel"><h2>Active users</h2><canvas id="chart-users"></canvas></div>
+    </div>
+
+    <div class="panel full" style="margin-top:16px">
+      <h2>Per-scenario breakdown</h2>
+      <table id="scn-table"><thead><tr>
+        <th>Scenario</th><th class="num">Started</th><th class="num">Completed</th>
+        <th class="num">Failed</th><th class="num">Tool calls</th><th class="num">Tokens</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="panel full" style="margin-top:16px">
+      <h2>Tool call counts</h2>
+      <table id="tool-table"><thead><tr><th>Tool</th><th class="num">Calls</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

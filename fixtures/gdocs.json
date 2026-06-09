@@ -1,0 +1,14 @@
+{
+  "gdocs_search": {
+    "query": "{query}",
+    "results": [
+      {"doc_id": "1aBcAtlasBrief", "title": "Project Atlas — Brief", "snippet": "Objectives, scope and milestones for the Atlas ingestion pipeline."},
+      {"doc_id": "1aBcAtlasNotes", "title": "Atlas — Weekly Notes", "snippet": "Running notes from the weekly sync."}
+    ]
+  },
+  "gdocs_create": [
+    {"doc_id": "1NewDocAtlas01", "title": "{title}", "url": "https://docs.google.com/document/d/1NewDocAtlas01/edit", "status": "created"},
+    {"doc_id": "1NewDocAtlas02", "title": "{title}", "url": "https://docs.google.com/document/d/1NewDocAtlas02/edit", "status": "created"}
+  ],
+  "gdocs_append": {"doc_id": "{doc_id}", "status": "updated", "revision": "rev-218"}
+}

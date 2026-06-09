@@ -1,0 +1,29 @@
+# Optional: build the image in-cluster from a Git repo using OpenShift BuildConfig.
+# Alternatively build locally with `podman build -t agentic-loadtest .` and push.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: agentic-loadtest
+  labels: { app: agentic-loadtest }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: agentic-loadtest
+  labels: { app: agentic-loadtest }
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/YOUR_ORG/agentic-loadtest.git
+      ref: main
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: agentic-loadtest:latest
+  triggers:
+    - type: ConfigChange

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentic-loadtest
+  labels: { app: agentic-loadtest }
+spec:
+  selector: { app: agentic-loadtest }
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
