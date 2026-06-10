@@ -34,7 +34,8 @@ Shipped scenarios (`config/scenarios/*.yaml`):
 
 Add a scenario by dropping a YAML file in `config/scenarios/` (no code needed).
 Add a tool in `src/agentic_loadtest/tools/registry.py` and a fixture in
-`fixtures/*.json`.
+`fixtures/*.json`. Add a large system-prompt harness by dropping a `.md`/`.txt`
+file in `config/prompts/` — it appears in the UI's preset picker automatically.
 
 ## Metrics
 
@@ -52,6 +53,11 @@ Live, per-second and cumulative:
 Everything is tunable from the UI (or `config/config.example.yaml`):
 
 - **LLM connection**: base URL, API key, model, temperature, max tokens, timeout
+- **System prompt (agent harness)**: a large, shared preamble prepended to every
+  scenario — mimicking the big standing system prompts of Claude Code / Hermes so
+  prompt-token counts start high and grow fast. Pick a shipped preset
+  (`config/prompts/*.md`), paste your own, or point `preamble_file` at a file.
+  `position: prepend` layers it over the scenario persona; `replace` uses it alone.
 - **Load profile**: users, ramp-up, duration (or iterations/user), max concurrent
   in-flight requests, think-time between turns
 - **Tool simulation**: fixtures-first with optional LLM fallback; simulated tool

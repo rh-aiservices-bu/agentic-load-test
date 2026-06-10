@@ -30,7 +30,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 def create_app(settings: ServerSettings) -> FastAPI:
     app = FastAPI(title="Agentic Load Test", version="0.1.0")
-    orch = Orchestrator(settings.scenarios_dir, settings.fixtures_dir)
+    orch = Orchestrator(settings.scenarios_dir, settings.fixtures_dir, settings.prompts_dir)
     default_config = load_run_config(settings.config)
 
     app.state.orchestrator = orch
@@ -62,6 +62,29 @@ def create_app(settings: ServerSettings) -> FastAPI:
     async def reload_scenarios() -> dict:
         orch.reload_scenarios()
         return {"count": len(orch.available_scenarios)}
+
+    @app.get("/api/prompts")
+    async def prompts() -> dict:
+        """List available system-prompt presets with a rough token estimate."""
+        items = []
+        d = settings.prompts_dir
+        if d.exists():
+            for fp in sorted(d.glob("*.md")) + sorted(d.glob("*.txt")):
+                text = fp.read_text()
+                items.append(
+                    {"name": fp.name, "chars": len(text), "tokens_est": max(1, len(text) // 4)}
+                )
+        return {"prompts": items}
+
+    @app.get("/api/prompts/{name}")
+    async def prompt(name: str) -> JSONResponse:
+        """Return the contents of one preset (used by the UI 'Load preset' button)."""
+        # Guard against path traversal: only a bare filename in the prompts dir.
+        fp = (settings.prompts_dir / Path(name).name)
+        if not fp.is_file():
+            return JSONResponse({"error": "not found"}, status_code=404)
+        text = fp.read_text()
+        return JSONResponse({"name": fp.name, "content": text, "tokens_est": max(1, len(text) // 4)})
 
     @app.get("/api/config")
     async def get_config() -> dict:

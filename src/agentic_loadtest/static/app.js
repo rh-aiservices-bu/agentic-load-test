@@ -13,6 +13,7 @@ const FIELDS = {
   think_time_min_ms: "think_time_min_ms", think_time_max_ms: "think_time_max_ms",
   use_llm_fallback: "tool_sim.use_llm_fallback",
   min_latency_ms: "tool_sim.min_latency_ms", max_latency_ms: "tool_sim.max_latency_ms",
+  sp_preamble: "system_prompt.preamble", sp_position: "system_prompt.position",
 };
 const NUMERIC = new Set(["temperature", "max_tokens", "num_users", "ramp_up_s", "duration_s",
   "iterations_per_user", "max_concurrent_requests", "think_time_min_ms", "think_time_max_ms",
@@ -50,6 +51,30 @@ function collect() {
   cfg.scenario_weights = weights;
   return cfg;
 }
+
+function updatePromptTokens() {
+  const chars = $("sp_preamble").value.length;
+  $("sp_tokens").textContent = `~${Math.max(0, Math.round(chars / 4)).toLocaleString()} tok · ${chars.toLocaleString()} chars`;
+}
+$("sp_preamble").addEventListener("input", updatePromptTokens);
+
+async function loadPresets() {
+  const { prompts } = await (await fetch("/api/prompts")).json();
+  const sel = $("preset");
+  prompts.forEach((p) => {
+    const o = document.createElement("option");
+    o.value = p.name;
+    o.textContent = `${p.name} (~${p.tokens_est.toLocaleString()} tok)`;
+    sel.append(o);
+  });
+}
+$("preset").addEventListener("change", async (e) => {
+  const name = e.target.value;
+  if (!name) return;
+  const { content } = await (await fetch(`/api/prompts/${encodeURIComponent(name)}`)).json();
+  $("sp_preamble").value = content || "";
+  updatePromptTokens();
+});
 
 async function loadScenarios() {
   const { scenarios } = await (await fetch("/api/scenarios")).json();
@@ -117,6 +142,7 @@ function pushPoint(p) {
 function renderSnapshot(m, state) {
   $("c-users").textContent = fmt(m.active_users);
   $("c-tokens").textContent = fmt(m.total_tokens);
+  $("c-aptok").textContent = fmt(m.avg_prompt_tokens);
   $("c-tps").textContent = fmt(m.avg_tokens_per_sec);
   $("c-ttft").textContent = m.ttft.p95;
   $("c-reqs").textContent = fmt(m.requests_ok);
@@ -179,7 +205,9 @@ $("btn-stop").onclick = () => fetch("/api/stop", { method: "POST" });
 
 (async function init() {
   initCharts();
+  await loadPresets();
   populate(await (await fetch("/api/config")).json());
+  updatePromptTokens();
   await loadScenarios();
   const st = await (await fetch("/api/status")).json();
   setState(st.state, st.running);

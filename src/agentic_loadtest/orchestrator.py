@@ -13,9 +13,10 @@ import asyncio
 import random
 import time
 from enum import Enum
+from pathlib import Path
 
 from .agent import AgentRunner
-from .config import RunConfig
+from .config import RunConfig, resolve_preamble
 from .llm import LLMClient
 from .metrics import Metrics
 from .scenarios import Scenario, load_scenarios
@@ -32,9 +33,11 @@ class RunState(str, Enum):
 class Orchestrator:
     """Single-run controller. One instance per process; reset between runs."""
 
-    def __init__(self, scenarios_dir, fixtures_dir) -> None:
+    def __init__(self, scenarios_dir, fixtures_dir, prompts_dir=None) -> None:
         self._scenarios_dir = scenarios_dir
         self._fixtures_dir = fixtures_dir
+        # Default the prompts dir next to the scenarios dir (config/prompts).
+        self._prompts_dir = prompts_dir or Path(scenarios_dir).parent / "prompts"
         self.available_scenarios: dict[str, Scenario] = load_scenarios(scenarios_dir)
 
         self.state: RunState = RunState.IDLE
@@ -97,7 +100,8 @@ class Orchestrator:
         simulator = ToolSimulator(
             self._fixtures_dir, cfg.tool_sim, self._llm, self.metrics, cfg.model_for_tool_sim()
         )
-        runner = AgentRunner(cfg, self._llm, simulator, self.metrics)
+        preamble = resolve_preamble(cfg.system_prompt, self._prompts_dir)
+        runner = AgentRunner(cfg, self._llm, simulator, self.metrics, preamble=preamble)
         scenarios, weights = self._weighted_scenarios(cfg)
 
         # Stagger user starts across the ramp-up window.

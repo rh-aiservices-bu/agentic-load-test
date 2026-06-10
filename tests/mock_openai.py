@@ -35,6 +35,10 @@ async def chat(request: Request):
     messages = body.get("messages", [])
     tools = body.get("tools")
     has_tool_result = any(m.get("role") == "tool" for m in messages)
+    # Estimate prompt tokens from the actual request so a large system prompt
+    # visibly inflates the reported usage (~4 chars/token).
+    prompt_chars = sum(len(str(m.get("content", "") or "")) for m in messages)
+    prompt_tokens = max(1, prompt_chars // 4)
 
     async def gen():
         if tools and not has_tool_result:
@@ -48,7 +52,8 @@ async def chat(request: Request):
             for word in ["Here ", "is ", "the ", "summary ", "you ", "asked ", "for."]:
                 yield chunk({"content": word})
             yield chunk(finish="stop")
-        yield chunk(usage={"prompt_tokens": 120, "completion_tokens": 40, "total_tokens": 160})
+        yield chunk(usage={"prompt_tokens": prompt_tokens, "completion_tokens": 40,
+                            "total_tokens": prompt_tokens + 40})
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream")

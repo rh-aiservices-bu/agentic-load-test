@@ -49,6 +49,7 @@
   .scn-weights { display:grid; grid-template-columns:1fr 70px; gap:6px 8px; align-items:center; }
   .scn-weights span { font-size:12px; }
   .full { grid-column:1/-1; }
+  .muted { color:var(--muted); font-weight:400; }
   details summary { cursor:pointer; color:var(--muted); font-size:12px; margin-top:10px; }
 </style>
 </head>
@@ -73,6 +74,16 @@
       <div><label>Temperature</label><input id="temperature" type="number" step="0.1" /></div>
       <div><label>Max tokens</label><input id="max_tokens" type="number" /></div>
     </div>
+
+    <h2 style="margin-top:18px">System prompt (agent harness)</h2>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:2"><label>Load preset</label>
+        <select id="preset"><option value="">— none —</option></select></div>
+      <div><label>Position</label>
+        <select id="sp_position"><option value="prepend">prepend</option><option value="replace">replace</option></select></div>
+    </div>
+    <label>Preamble (prepended to every scenario) — <span id="sp_tokens" class="muted">~0 tok</span></label>
+    <textarea id="sp_preamble" placeholder="Paste a large Claude Code / Hermes style system prompt here, or load a preset above."></textarea>
 
     <h2 style="margin-top:18px">Load profile</h2>
     <div class="row">
@@ -115,6 +126,7 @@
     <div class="cards">
       <div class="card"><div class="v" id="c-users">0</div><div class="l">Active users</div></div>
       <div class="card"><div class="v" id="c-tokens">0</div><div class="l">Total tokens</div></div>
+      <div class="card"><div class="v" id="c-aptok">0</div><div class="l">Avg prompt tok/req</div></div>
       <div class="card"><div class="v" id="c-tps">0</div><div class="l">Tokens / sec</div></div>
       <div class="card"><div class="v" id="c-ttft">0</div><div class="l">TTFT p95 (s)</div></div>
       <div class="card"><div class="v" id="c-reqs">0</div><div class="l">Requests OK</div></div>

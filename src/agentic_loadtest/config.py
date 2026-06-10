@@ -51,11 +51,35 @@ class ToolSimConfig(BaseModel):
     max_latency_ms: int = Field(default=400, ge=0, description="Simulated tool latency ceiling.")
 
 
+class SystemPromptConfig(BaseModel):
+    """A large, shared "agent harness" system prompt layered over each scenario.
+
+    This mimics how Claude Code / Hermes prepend a big standing system prompt to
+    every request, so prompt-token counts start high from the very first call and
+    grow as the conversation accumulates tool output.
+    """
+
+    preamble: str = Field(
+        default="",
+        description="Inline harness prompt prepended to each scenario's persona.",
+    )
+    preamble_file: str | None = Field(
+        default=None,
+        description="Path to a prompt file. Used when 'preamble' is empty. "
+        "Resolved relative to the prompts dir, then the working dir.",
+    )
+    position: str = Field(
+        default="prepend",
+        description="'prepend' = harness then scenario persona; 'replace' = harness only.",
+    )
+
+
 class RunConfig(BaseModel):
     """Parameters of a single load-test run."""
 
     llm: LLMConfig = Field(default_factory=LLMConfig)
     tool_sim: ToolSimConfig = Field(default_factory=ToolSimConfig)
+    system_prompt: SystemPromptConfig = Field(default_factory=SystemPromptConfig)
 
     num_users: int = Field(default=10, ge=1, le=5000, description="Concurrent simulated users.")
     ramp_up_s: float = Field(default=5.0, ge=0, description="Spread user starts over this window.")
@@ -92,6 +116,7 @@ class ServerSettings(BaseSettings):
     config: Path = Path("config/config.example.yaml")
     scenarios_dir: Path = Path("config/scenarios")
     fixtures_dir: Path = Path("fixtures")
+    prompts_dir: Path = Path("config/prompts")
 
 
 def load_run_config(path: Path) -> RunConfig:
@@ -111,6 +136,22 @@ def load_run_config(path: Path) -> RunConfig:
     if v := os.getenv("ALT_LLM_MODEL"):
         cfg.llm.model = v
     return cfg
+
+
+def resolve_preamble(cfg: SystemPromptConfig, prompts_dir: Path) -> str:
+    """Return the effective harness preamble text.
+
+    Inline ``preamble`` wins; otherwise ``preamble_file`` is read (looked up in
+    ``prompts_dir`` first, then as a plain path). Returns "" if neither yields text.
+    """
+
+    if cfg.preamble.strip():
+        return cfg.preamble
+    if cfg.preamble_file:
+        for candidate in (prompts_dir / cfg.preamble_file, Path(cfg.preamble_file)):
+            if candidate.is_file():
+                return candidate.read_text()
+    return ""
 
 
 def dump_run_config(cfg: RunConfig, path: Path) -> None:

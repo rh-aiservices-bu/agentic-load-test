@@ -160,6 +160,9 @@ class Metrics:
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
+            "avg_prompt_tokens": round(self.prompt_tokens / self.requests_ok)
+            if self.requests_ok
+            else 0,
             "avg_tokens_per_sec": round(self.total_tokens / self.elapsed_s, 1)
             if self.elapsed_s > 0
             else 0.0,

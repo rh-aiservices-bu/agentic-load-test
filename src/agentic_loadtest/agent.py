@@ -33,11 +33,23 @@ class AgentRunner:
         llm: LLMClient,
         simulator: ToolSimulator,
         metrics: Metrics,
+        preamble: str = "",
     ) -> None:
         self.cfg = cfg
         self.llm = llm
         self.simulator = simulator
         self.metrics = metrics
+        # Large shared "agent harness" prompt, resolved once per run.
+        self.preamble = preamble
+
+    def _system_prompt(self, scenario: Scenario) -> str:
+        """Combine the harness preamble with the scenario's task-specific persona."""
+
+        if not self.preamble:
+            return scenario.persona
+        if self.cfg.system_prompt.position == "replace":
+            return self.preamble
+        return f"{self.preamble}\n\n{scenario.persona}"
 
     async def run(self, scenario: Scenario) -> bool:
         """Run one full scenario (including follow-ups). Returns True on success."""
@@ -45,7 +57,7 @@ class AgentRunner:
         self.metrics.scenario_started(scenario.name)
         tools = schemas_for(scenario.tools)
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": scenario.persona},
+            {"role": "system", "content": self._system_prompt(scenario)},
             {"role": "user", "content": scenario.goal},
         ]
 
