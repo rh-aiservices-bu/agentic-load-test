@@ -90,12 +90,20 @@ PYTHONPATH=src .venv/bin/python tests/e2e_run.py   # drives a short run, asserts
 ## Container
 
 ```bash
-podman build -t agentic-loadtest -f Containerfile .
+# Build for the cluster's architecture. OpenShift nodes are usually amd64, so on
+# Apple Silicon add --platform=linux/amd64 (otherwise the image won't run there).
+podman build --platform=linux/amd64 -t agentic-loadtest -f Containerfile .
 podman run -p 8080:8080 -e ALT_LLM_API_KEY=sk-... agentic-loadtest
 ```
 
-The image is based on UBI9 Python and runs as an arbitrary non-root UID
-(OpenShift `restricted` SCC compatible).
+The image is based on UBI9 Python and runs as an **arbitrary non-root UID in
+group 0** (OpenShift `restricted-v2` SCC compatible). Permission setup runs as
+root at build time, then the runtime drops to a non-root user. Verified by
+running locally as a random UID:
+
+```bash
+podman run --user 100777:0 -p 8081:8080 agentic-loadtest   # mimics OpenShift
+```
 
 ## Deploy to OpenShift
 

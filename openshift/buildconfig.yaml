@@ -15,7 +15,7 @@ spec:
   source:
     type: Git
     git:
-      uri: https://github.com/YOUR_ORG/agentic-loadtest.git
+      uri: https://github.com/rh-aiservices-bu/agentic-load-test.git
       ref: main
   strategy:
     type: Docker
