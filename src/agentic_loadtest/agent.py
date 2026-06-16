@@ -42,22 +42,27 @@ class AgentRunner:
         # Large shared "agent harness" prompt, resolved once per run.
         self.preamble = preamble
 
-    def _system_prompt(self, scenario: Scenario) -> str:
+    def _system_prompt(self, scenario: Scenario, preamble: str) -> str:
         """Combine the harness preamble with the scenario's task-specific persona."""
 
-        if not self.preamble:
+        if not preamble:
             return scenario.persona
         if self.cfg.system_prompt.position == "replace":
-            return self.preamble
-        return f"{self.preamble}\n\n{scenario.persona}"
+            return preamble
+        return f"{preamble}\n\n{scenario.persona}"
 
-    async def run(self, scenario: Scenario) -> bool:
-        """Run one full scenario (including follow-ups). Returns True on success."""
+    async def run(self, scenario: Scenario, preamble: str | None = None) -> bool:
+        """Run one full scenario (including follow-ups). Returns True on success.
+
+        ``preamble`` overrides the runner's default harness prompt for this run —
+        used to give each user their assigned large prompt from the pool.
+        """
 
         self.metrics.scenario_started(scenario.name)
         tools = schemas_for(scenario.tools)
+        effective_preamble = self.preamble if preamble is None else preamble
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self._system_prompt(scenario)},
+            {"role": "system", "content": self._system_prompt(scenario, effective_preamble)},
             {"role": "user", "content": scenario.goal},
         ]
 

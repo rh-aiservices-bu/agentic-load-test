@@ -98,6 +98,7 @@ def create_app(settings: ServerSettings) -> FastAPI:
             "running": orch.is_running,
             "config": orch.config.model_dump(mode="json") if orch.config else None,
             "metrics": orch.metrics.snapshot() if orch.metrics else None,
+            "prompt_pool": orch.pool_info,
         }
 
     @app.get("/api/timeline")
@@ -131,6 +132,7 @@ def create_app(settings: ServerSettings) -> FastAPI:
                     "state": orch.state.value,
                     "running": orch.is_running,
                     "metrics": orch.metrics.snapshot() if orch.metrics else None,
+                    "prompt_pool": orch.pool_info,
                     "point": orch.metrics.timeline[-1]
                     if orch.metrics and orch.metrics.timeline
                     else None,

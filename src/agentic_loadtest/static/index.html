@@ -85,6 +85,17 @@
     <label>Preamble (prepended to every scenario) — <span id="sp_tokens" class="muted">~0 tok</span></label>
     <textarea id="sp_preamble" placeholder="Paste a large Claude Code / Hermes style system prompt here, or load a preset above."></textarea>
 
+    <h2 style="margin-top:18px">Prompt pool (KV-cache / llm-d demo)</h2>
+    <div class="row">
+      <div><label>Unique prompts (0=off)</label><input id="num_unique_prompts" type="number" min="0" /></div>
+      <div><label>Tokens / prompt</label><input id="prompt_tokens_target" type="number" min="100" /></div>
+    </div>
+    <div id="pool-info" class="muted" style="font-size:12px;margin-top:6px">
+      0 distinct large prompts. When &gt; 0, each user is assigned one (round-robin) so many
+      users share each large prefix — letting llm-d prefix-aware routing reuse the KV cache.
+      Overrides the single preamble above.
+    </div>
+
     <h2 style="margin-top:18px">Load profile</h2>
     <div class="row">
       <div><label>Users</label><input id="num_users" type="number" /></div>
@@ -133,13 +144,15 @@
       <div class="card"><div class="v" id="c-fail">0</div><div class="l">Failed</div></div>
       <div class="card"><div class="v" id="c-tools">0</div><div class="l">Tool calls</div></div>
       <div class="card"><div class="v" id="c-lat">0</div><div class="l">Latency p95 (s)</div></div>
+      <div class="card" style="border-color:var(--good)"><div class="v" id="c-cache" style="color:var(--good)">0%</div><div class="l">KV cache hit rate</div></div>
+      <div class="card"><div class="v" id="c-cached">0</div><div class="l">Cached tokens</div></div>
     </div>
 
     <div class="charts">
       <div class="panel"><h2>Cumulative token usage</h2><canvas id="chart-tokens"></canvas></div>
       <div class="panel"><h2>Throughput (tokens/s · reqs/s)</h2><canvas id="chart-rate"></canvas></div>
       <div class="panel"><h2>TTFT (p50 / p95)</h2><canvas id="chart-ttft"></canvas></div>
-      <div class="panel"><h2>Active users</h2><canvas id="chart-users"></canvas></div>
+      <div class="panel"><h2>KV cache hit rate (cumulative · interval)</h2><canvas id="chart-cache"></canvas></div>
     </div>
 
     <div class="panel full" style="margin-top:16px">

@@ -42,6 +42,24 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+def _cached_tokens(usage: Any) -> int:
+    """Extract prefix-cache hit tokens from a usage object.
+
+    vLLM/llm-d report KV prefix-cache reuse via OpenAI's
+    ``usage.prompt_tokens_details.cached_tokens``. Handle both the SDK's nested
+    object and a plain dict, and tolerate servers that omit the field.
+    """
+
+    details = getattr(usage, "prompt_tokens_details", None)
+    if details is None and isinstance(usage, dict):
+        details = usage.get("prompt_tokens_details")
+    if details is None:
+        return 0
+    if isinstance(details, dict):
+        return int(details.get("cached_tokens", 0) or 0)
+    return int(getattr(details, "cached_tokens", 0) or 0)
+
+
 class _null_async_cm:
     """No-op async context manager used when concurrency is unbounded."""
 
@@ -145,9 +163,11 @@ class LLMClient:
             if v["name"]
         ]
 
+        cached_tokens = 0
         if usage is not None:
             prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
             completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+            cached_tokens = _cached_tokens(usage)
         else:
             prompt_tokens = sum(_estimate_tokens(str(m.get("content", ""))) for m in messages)
             completion_tokens = _estimate_tokens(content) + sum(
@@ -161,6 +181,7 @@ class LLMClient:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
+            cached_tokens=cached_tokens,
         )
 
         raw_message: dict[str, Any] = {"role": "assistant", "content": content or None}

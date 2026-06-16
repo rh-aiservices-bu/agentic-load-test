@@ -37,11 +37,38 @@ Add a tool in `src/agentic_loadtest/tools/registry.py` and a fixture in
 `fixtures/*.json`. Add a large system-prompt harness by dropping a `.md`/`.txt`
 file in `config/prompts/` — it appears in the UI's preset picker automatically.
 
+## KV-cache / llm-d prefix-routing demo
+
+To demonstrate the benefit of **llm-d's prefix-cache-aware (intelligent)
+scheduling**, the tool can drive a **pool of distinct large prompts** shared
+across users. Set `prompt_pool.num_unique_prompts` (in the UI: *Prompt pool*) to
+N and the tool builds N distinct, deterministic, large system prompts and assigns
+one to each user round-robin — so many users send the **same large prefix**.
+
+Why this shows the benefit:
+
+- Each prompt begins with a unique header, so the N prefixes are genuinely
+  distinct cache entries; each is large (`prompt_tokens_target`, ~1500 tok) so the
+  prefix is worth caching; and generation is deterministic so prefixes are stable.
+- With N distinct large prefixes across many replicas, **prefix-aware routing**
+  co-locates each prefix on the replica that already holds its KV cache (hit →
+  fast prefill → low TTFT). **Round-robin** routing scatters each prefix across
+  replicas, thrashing the cache (miss → full prefill → high TTFT).
+
+The tool reads vLLM/llm-d's `usage.prompt_tokens_details.cached_tokens` and shows
+a live **KV cache hit rate** (cumulative + interval) and **cached tokens**. Run
+the same config against a round-robin gateway vs an llm-d prefix-aware gateway and
+compare the hit rate and TTFT — that delta is the win.
+
+> Tip: use more unique prompts than a single replica's cache comfortably holds
+> (e.g. 16–64) with enough users that each prompt is shared by several users.
+
 ## Metrics
 
 Live, per-second and cumulative:
 
 - **Token usage growth** (prompt / completion / total) across all users
+- **KV cache hit rate** + cached tokens (prefix-cache reuse, from `cached_tokens`)
 - **TTFT** p50 / p95 / p99 (measured from streamed first token)
 - **Request latency** p50 / p95 / p99
 - **Throughput**: tokens/sec and requests/sec
@@ -125,8 +152,9 @@ oc get route agentic-loadtest -o jsonpath='{.spec.host}{"\n"}'
 | Module | Responsibility |
 |---|---|
 | `config.py` | `RunConfig` (per-run, UI-editable) + `ServerSettings` (env) |
-| `llm.py` | Async OpenAI-compatible client; streams to measure TTFT, accumulates tool-call deltas, captures token usage; global concurrency gate |
+| `llm.py` | Async OpenAI-compatible client; streams to measure TTFT, accumulates tool-call deltas, captures token usage + `cached_tokens`; global concurrency gate |
 | `tools/` | Tool schemas (`registry.py`) + hybrid fixture/LLM simulator (`simulator.py`) |
+| `prompt_pool.py` | Builds N distinct, deterministic large prompts for the KV-cache demo |
 | `scenarios.py` | YAML scenario loading |
 | `agent.py` | Multi-turn tool-calling agent loop for one scenario |
 | `orchestrator.py` | Ramps up N users, weighted scenario selection, duration/stop, per-second sampler |

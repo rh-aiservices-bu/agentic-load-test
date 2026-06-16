@@ -23,6 +23,7 @@ class CallResult:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cached_tokens: int = 0  # prefix-cache (KV cache) hit tokens reported by the server
     error: str | None = None
 
 
@@ -60,6 +61,7 @@ class Metrics:
         self.requests_failed: int = 0
         self.prompt_tokens: int = 0
         self.completion_tokens: int = 0
+        self.cached_tokens: int = 0  # prefix-cache hits across all requests
         self.tool_calls: int = 0
 
         # Live gauges.
@@ -78,6 +80,8 @@ class Metrics:
         self.timeline: list[dict[str, Any]] = []
         self._last_sample_tokens: int = 0
         self._last_sample_requests: int = 0
+        self._last_sample_prompt: int = 0
+        self._last_sample_cached: int = 0
         self._last_sample_t: float = self.start_time
 
     @property
@@ -96,6 +100,7 @@ class Metrics:
             self.requests_ok += 1
             self.prompt_tokens += result.prompt_tokens
             self.completion_tokens += result.completion_tokens
+            self.cached_tokens += result.cached_tokens
             stats.prompt_tokens += result.prompt_tokens
             stats.completion_tokens += result.completion_tokens
             if result.ttft_s is not None:
@@ -128,11 +133,22 @@ class Metrics:
         total_tokens = self.total_tokens
         total_requests = self.requests_ok + self.requests_failed
 
+        # Interval prefix-cache hit rate: shows the cache warming as the run
+        # proceeds (and, under prefix-aware routing, climbing toward steady state).
+        d_prompt = self.prompt_tokens - self._last_sample_prompt
+        d_cached = self.cached_tokens - self._last_sample_cached
+        interval_hit = round(d_cached / d_prompt, 4) if d_prompt > 0 else 0.0
+
         point = {
             "t": round(now - self.start_time, 2),
             "total_tokens": total_tokens,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
+            "cached_tokens": self.cached_tokens,
+            "cache_hit_rate": round(self.cached_tokens / self.prompt_tokens, 4)
+            if self.prompt_tokens
+            else 0.0,
+            "cache_hit_rate_interval": interval_hit,
             "tokens_per_sec": round((total_tokens - self._last_sample_tokens) / dt, 1),
             "requests_per_sec": round((total_requests - self._last_sample_requests) / dt, 2),
             "active_users": self.active_users,
@@ -141,6 +157,8 @@ class Metrics:
         }
         self._last_sample_tokens = total_tokens
         self._last_sample_requests = total_requests
+        self._last_sample_prompt = self.prompt_tokens
+        self._last_sample_cached = self.cached_tokens
         self._last_sample_t = now
         self.timeline.append(point)
         return point
@@ -160,6 +178,10 @@ class Metrics:
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
+            "cached_tokens": self.cached_tokens,
+            "cache_hit_rate": round(self.cached_tokens / self.prompt_tokens, 4)
+            if self.prompt_tokens
+            else 0.0,
             "avg_prompt_tokens": round(self.prompt_tokens / self.requests_ok)
             if self.requests_ok
             else 0,

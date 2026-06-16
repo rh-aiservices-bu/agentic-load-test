@@ -74,12 +74,39 @@ class SystemPromptConfig(BaseModel):
     )
 
 
+class PromptPoolConfig(BaseModel):
+    """A pool of distinct large prompts shared across users, for KV-cache demos.
+
+    When ``num_unique_prompts > 0``, the orchestrator builds that many distinct
+    large prompts and assigns one to each user (round-robin), so many users share
+    each large prefix. This is what makes llm-d's prefix-cache-aware scheduling
+    pay off: same prefix → same replica → KV cache hit → lower TTFT. Overrides the
+    single ``system_prompt`` preamble when enabled.
+    """
+
+    num_unique_prompts: int = Field(
+        default=0,
+        ge=0,
+        description="Number of distinct large prompts. 0 = disabled (use system_prompt).",
+    )
+    prompt_tokens_target: int = Field(
+        default=1500,
+        ge=100,
+        description="Approximate size of each large prompt (the shared cacheable prefix).",
+    )
+    assignment: str = Field(
+        default="round_robin",
+        description="How users map to prompts. 'round_robin' = even, deterministic sharing.",
+    )
+
+
 class RunConfig(BaseModel):
     """Parameters of a single load-test run."""
 
     llm: LLMConfig = Field(default_factory=LLMConfig)
     tool_sim: ToolSimConfig = Field(default_factory=ToolSimConfig)
     system_prompt: SystemPromptConfig = Field(default_factory=SystemPromptConfig)
+    prompt_pool: PromptPoolConfig = Field(default_factory=PromptPoolConfig)
 
     num_users: int = Field(default=10, ge=1, le=5000, description="Concurrent simulated users.")
     ramp_up_s: float = Field(default=5.0, ge=0, description="Spread user starts over this window.")

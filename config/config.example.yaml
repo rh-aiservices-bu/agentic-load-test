@@ -90,6 +90,14 @@ system_prompt:
     \ with the outcome.\n"
   preamble_file: null
   position: prepend
+prompt_pool:
+  # KV-cache / llm-d prefix-routing demo. When > 0, build this many DISTINCT large
+  # prompts and assign one to each user (round-robin), so many users share each
+  # large prefix. Overrides system_prompt.preamble. Set e.g. 8 with 50+ users to
+  # show prefix-cache reuse (watch the "KV cache hit rate" climb).
+  num_unique_prompts: 0
+  prompt_tokens_target: 1500   # approx size of each shared, cacheable prefix
+  assignment: round_robin
 num_users: 2
 ramp_up_s: 5.0
 duration_s: 30.0

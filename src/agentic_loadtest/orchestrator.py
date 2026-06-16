@@ -19,6 +19,7 @@ from .agent import AgentRunner
 from .config import RunConfig, resolve_preamble
 from .llm import LLMClient
 from .metrics import Metrics
+from .prompt_pool import build_prompt_pool, pool_summary
 from .scenarios import Scenario, load_scenarios
 from .tools import ToolSimulator
 
@@ -43,6 +44,8 @@ class Orchestrator:
         self.state: RunState = RunState.IDLE
         self.metrics: Metrics | None = None
         self.config: RunConfig | None = None
+        self.prompt_pool: list[str] = []
+        self.pool_info: dict = {}
 
         self._llm: LLMClient | None = None
         self._stop = asyncio.Event()
@@ -104,6 +107,17 @@ class Orchestrator:
         runner = AgentRunner(cfg, self._llm, simulator, self.metrics, preamble=preamble)
         scenarios, weights = self._weighted_scenarios(cfg)
 
+        # Build the pool of distinct large prompts (for KV-cache demos). Empty
+        # when num_unique_prompts == 0, in which case the single preamble is used.
+        self.prompt_pool = build_prompt_pool(
+            cfg.prompt_pool.num_unique_prompts, cfg.prompt_pool.prompt_tokens_target
+        )
+        self.pool_info = pool_summary(self.prompt_pool)
+        if self.prompt_pool:
+            log_n = len(self.prompt_pool)
+            shared = cfg.num_users / log_n if log_n else 0
+            self.pool_info["users_per_prompt"] = round(shared, 1)
+
         # Stagger user starts across the ramp-up window.
         per_user_delay = (cfg.ramp_up_s / cfg.num_users) if cfg.num_users else 0.0
         self._tasks = [
@@ -142,13 +156,17 @@ class Orchestrator:
             except asyncio.TimeoutError:
                 pass
 
+        # Assign this user a fixed large prompt from the pool (round-robin), so
+        # many users share each prefix and a given user always sends the same one.
+        preamble = self.prompt_pool[user_id % len(self.prompt_pool)] if self.prompt_pool else None
+
         self.metrics.active_users += 1
         try:
             iterations = 0
             while not self._stop.is_set():
                 scenario = random.choices(scenarios, weights=weights, k=1)[0]
                 try:
-                    await runner.run(scenario)
+                    await runner.run(scenario, preamble=preamble)
                 except Exception:
                     # A crashed scenario must not kill the user loop.
                     pass

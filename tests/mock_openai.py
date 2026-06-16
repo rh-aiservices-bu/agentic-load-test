@@ -15,6 +15,10 @@ from fastapi.responses import StreamingResponse
 
 app = FastAPI()
 
+# Simulate a prefix cache: remember system-prompt prefixes we've "seen" and
+# report a high cached_tokens hit on subsequent requests carrying the same one.
+_SEEN_PREFIXES: set[str] = set()
+
 
 def chunk(delta=None, finish=None, usage=None):
     payload = {
@@ -40,6 +44,17 @@ async def chat(request: Request):
     prompt_chars = sum(len(str(m.get("content", "") or "")) for m in messages)
     prompt_tokens = max(1, prompt_chars // 4)
 
+    # Prefix-cache simulation: key on the system prompt (the large shared prefix).
+    # First time we see it -> miss (0 cached); afterwards -> ~90% of it is cached.
+    system = next((m.get("content", "") for m in messages if m.get("role") == "system"), "")
+    sys_tokens = max(1, len(str(system)) // 4)
+    key = str(system)[:512]
+    cached_tokens = 0
+    if key in _SEEN_PREFIXES:
+        cached_tokens = int(sys_tokens * 0.9)
+    else:
+        _SEEN_PREFIXES.add(key)
+
     async def gen():
         if tools and not has_tool_result:
             name = tools[0]["function"]["name"]
@@ -53,7 +68,8 @@ async def chat(request: Request):
                 yield chunk({"content": word})
             yield chunk(finish="stop")
         yield chunk(usage={"prompt_tokens": prompt_tokens, "completion_tokens": 40,
-                            "total_tokens": prompt_tokens + 40})
+                            "total_tokens": prompt_tokens + 40,
+                            "prompt_tokens_details": {"cached_tokens": cached_tokens}})
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream")

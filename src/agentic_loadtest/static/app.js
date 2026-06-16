@@ -14,10 +14,12 @@ const FIELDS = {
   use_llm_fallback: "tool_sim.use_llm_fallback",
   min_latency_ms: "tool_sim.min_latency_ms", max_latency_ms: "tool_sim.max_latency_ms",
   sp_preamble: "system_prompt.preamble", sp_position: "system_prompt.position",
+  num_unique_prompts: "prompt_pool.num_unique_prompts",
+  prompt_tokens_target: "prompt_pool.prompt_tokens_target",
 };
 const NUMERIC = new Set(["temperature", "max_tokens", "num_users", "ramp_up_s", "duration_s",
   "iterations_per_user", "max_concurrent_requests", "think_time_min_ms", "think_time_max_ms",
-  "min_latency_ms", "max_latency_ms"]);
+  "min_latency_ms", "max_latency_ms", "num_unique_prompts", "prompt_tokens_target"]);
 
 function getPath(obj, path) { return path.split(".").reduce((o, k) => o?.[k], obj); }
 function setPath(obj, path, val) {
@@ -57,6 +59,28 @@ function updatePromptTokens() {
   $("sp_tokens").textContent = `~${Math.max(0, Math.round(chars / 4)).toLocaleString()} tok · ${chars.toLocaleString()} chars`;
 }
 $("sp_preamble").addEventListener("input", updatePromptTokens);
+
+function updatePoolInfo(live) {
+  const el = $("pool-info");
+  if (live && live.count > 0) {
+    el.innerHTML = `<b style="color:var(--good)">${live.count} distinct large prompts</b> in use, ` +
+      `~${live.avg_tokens.toLocaleString()} tok each, ~${live.users_per_prompt} users/prompt sharing each prefix. ` +
+      `Watch the KV cache hit rate climb — that's prefix reuse llm-d can route on.`;
+    return;
+  }
+  const n = Number($("num_unique_prompts").value) || 0;
+  const t = Number($("prompt_tokens_target").value) || 0;
+  const u = Number($("num_users").value) || 0;
+  if (n <= 0) {
+    el.innerHTML = "Disabled — using the single preamble above. Set &gt; 0 to drive a pool of distinct large prompts.";
+  } else {
+    const per = u ? (u / n).toFixed(1) : "—";
+    el.innerHTML = `<b>${n} distinct large prompts</b>, ~${t.toLocaleString()} tok each, ~${per} users sharing each. ` +
+      `Many users → same large prefix → llm-d prefix-aware routing reuses the KV cache. Overrides the single preamble.`;
+  }
+}
+["num_unique_prompts", "prompt_tokens_target", "num_users"].forEach((id) =>
+  $(id).addEventListener("input", () => updatePoolInfo()));
 
 async function loadPresets() {
   const { prompts } = await (await fetch("/api/prompts")).json();
@@ -119,7 +143,10 @@ function initCharts() {
     { y1: { position: "right", beginAtZero: true, ticks: { color: "#f778ba" }, grid: { drawOnChartArea: false } } });
   charts.ttft = mkChart("chart-ttft", [
     { label: "p50", ...C("#3fb950") }, { label: "p95", ...C("#f85149") }]);
-  charts.users = mkChart("chart-users", [{ label: "active", ...C("#a371f7"), fill: true }]);
+  charts.cache = mkChart("chart-cache", [
+    { label: "cumulative", ...C("#3fb950"), fill: true },
+    { label: "interval", ...C("#d29922") }],
+    { y: { beginAtZero: true, max: 1, ticks: { color: "#8b98a5" }, grid: { color: "#222c38" } } });
 }
 
 const MAX_POINTS = 600;
@@ -136,7 +163,7 @@ function pushPoint(p) {
   push(charts.tokens, [p.prompt_tokens, p.completion_tokens, p.total_tokens]);
   push(charts.rate, [p.tokens_per_sec, p.requests_per_sec]);
   push(charts.ttft, [p.ttft_p50, p.ttft_p95]);
-  push(charts.users, [p.active_users]);
+  push(charts.cache, [p.cache_hit_rate ?? 0, p.cache_hit_rate_interval ?? 0]);
 }
 
 function renderSnapshot(m, state) {
@@ -149,6 +176,8 @@ function renderSnapshot(m, state) {
   $("c-fail").textContent = fmt(m.requests_failed);
   $("c-tools").textContent = fmt(m.tool_calls);
   $("c-lat").textContent = m.latency.p95;
+  $("c-cache").textContent = ((m.cache_hit_rate ?? 0) * 100).toFixed(1) + "%";
+  $("c-cached").textContent = fmt(m.cached_tokens);
   $("elapsed").textContent = Math.round(m.elapsed_s) + "s";
 
   const sb = document.querySelector("#scn-table tbody"); sb.innerHTML = "";
@@ -180,6 +209,7 @@ function connectWS() {
     const d = JSON.parse(ev.data);
     setState(d.state, d.running);
     if (d.metrics) renderSnapshot(d.metrics, d.state);
+    if (d.running && d.prompt_pool) updatePoolInfo(d.prompt_pool);
     if (d.point && d.point.t !== lastT) { lastT = d.point.t; pushPoint(d.point); }
   };
   ws.onclose = () => setTimeout(connectWS, 2000);
@@ -208,6 +238,7 @@ $("btn-stop").onclick = () => fetch("/api/stop", { method: "POST" });
   await loadPresets();
   populate(await (await fetch("/api/config")).json());
   updatePromptTokens();
+  updatePoolInfo();
   await loadScenarios();
   const st = await (await fetch("/api/status")).json();
   setState(st.state, st.running);
