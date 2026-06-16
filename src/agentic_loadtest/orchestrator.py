@@ -19,6 +19,7 @@ from .agent import AgentRunner
 from .config import RunConfig, resolve_preamble
 from .llm import LLMClient
 from .metrics import Metrics
+from .metrics_scraper import scrape_prefix_cache
 from .prompt_pool import build_prompt_pool, pool_summary
 from .scenarios import Scenario, load_scenarios
 from .tools import ToolSimulator
@@ -52,6 +53,7 @@ class Orchestrator:
         self._tasks: list[asyncio.Task] = []
         self._supervisor: asyncio.Task | None = None
         self._sampler: asyncio.Task | None = None
+        self._scraper: asyncio.Task | None = None
 
     # ----- public API ------------------------------------------------------
 
@@ -76,6 +78,8 @@ class Orchestrator:
 
         self._sampler = asyncio.create_task(self._sample_loop())
         self._supervisor = asyncio.create_task(self._supervise(cfg))
+        if cfg.vllm_metrics.enabled and cfg.vllm_metrics.endpoints:
+            self._scraper = asyncio.create_task(self._scrape_loop(cfg))
 
     async def stop(self) -> None:
         if not self.is_running:
@@ -209,9 +213,27 @@ class Orchestrator:
                 continue
         self.metrics.sample_timeline()  # final point
 
+    async def _scrape_loop(self, cfg: RunConfig) -> None:
+        """Poll vLLM /metrics for the real fleet-wide prefix-cache hit rate."""
+        assert self.metrics is not None
+        m = cfg.vllm_metrics
+        while not self._stop.is_set():
+            try:
+                res = await scrape_prefix_cache(m.endpoints, m.expand_dns)
+                if res["targets"]:
+                    self.metrics.set_server_cache(res["hits"], res["queries"], res["targets"])
+            except Exception:
+                pass  # a scrape failure must never disrupt the run
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=m.poll_interval_s)
+            except asyncio.TimeoutError:
+                continue
+
     async def _teardown(self) -> None:
         if self._sampler:
             self._sampler.cancel()
+        if self._scraper:
+            self._scraper.cancel()
         if self._llm:
             await self._llm.close()
         self.state = RunState.FINISHED

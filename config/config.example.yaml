@@ -1,30 +1,52 @@
+# Default RunConfig for the agentic load test. The UI loads this on startup and
+# overwrites it with the last run's settings. Edit here to change defaults, or
+# point ALT_CONFIG at a different file.
+
 llm:
-  base_url: http://127.0.0.1:8099/v1
-  api_key: t
-  model: mock
+  base_url: https://api.openai.com/v1
+  api_key: sk-no-key-required        # override via the UI or ALT_LLM_API_KEY
+  model: gpt-4o-mini
   temperature: 0.7
   max_tokens: 1024
   request_timeout_s: 120.0
   extra_headers: {}
+
 tool_sim:
-  use_llm_fallback: false
+  use_llm_fallback: true
   fallback_model: null
   fallback_max_tokens: 400
-  min_latency_ms: 0
-  max_latency_ms: 3
+  min_latency_ms: 50
+  max_latency_ms: 400
+
 system_prompt:
-  preamble: ''
-  preamble_file: null
+  preamble: ""
+  preamble_file: null                # e.g. hermes_agent.md (used when prompt_pool off)
   position: prepend
+
 prompt_pool:
-  num_unique_prompts: 0
+  # KV-cache / llm-d demo: N distinct large prompts shared across users.
+  num_unique_prompts: 0              # set e.g. 10 with 50+ users
   prompt_tokens_target: 1500
   assignment: round_robin
-num_users: 4
-ramp_up_s: 0.2
-duration_s: 2.0
+
+vllm_metrics:
+  # Scrape vLLM Prometheus /metrics for the REAL prefix-cache hit rate. Use this
+  # when the model returns `prompt_tokens_details: null` (no per-request
+  # cached_tokens) even though prefix caching is active. Point at a headless
+  # service host with expand_dns to aggregate across all replicas.
+  enabled: false
+  endpoints: []
+  # Example (KServe/llm-d inference pool headless service, serving port 8000):
+  #   - https://qwen-tools-inference-pool-ip-XXXXXXXX.demo-llm.svc.cluster.local:8000/metrics
+  expand_dns: true
+  poll_interval_s: 2.0
+
+num_users: 10
+ramp_up_s: 5.0
+duration_s: 300.0
 iterations_per_user: 0
 max_concurrent_requests: 100
-think_time_min_ms: 0
-think_time_max_ms: 20
+think_time_min_ms: 200
+think_time_max_ms: 1500
+
 scenario_weights: {}

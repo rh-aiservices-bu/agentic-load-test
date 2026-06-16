@@ -60,6 +60,34 @@ a live **KV cache hit rate** (cumulative + interval) and **cached tokens**. Run
 the same config against a round-robin gateway vs an llm-d prefix-aware gateway and
 compare the hit rate and TTFT — that delta is the win.
 
+### When the model returns `prompt_tokens_details: null`
+
+Some vLLM builds (e.g. 0.18.x) do prefix caching but **don't** report per-request
+`cached_tokens` in the OpenAI response — so the cache-hit card stays at 0% even
+though caching is working (you'll see `Prefix cache hit rate: NN%` in the vLLM
+pod logs). The authoritative numbers are the Prometheus counters
+`vllm:prefix_cache_hits_total` / `vllm:prefix_cache_queries_total` on each pod's
+`/metrics`.
+
+Enable **`vllm_metrics`** (UI: *vLLM metrics scrape*) to poll those counters and
+show the real fleet-wide hit rate. Point `endpoints` at a **headless** service
+host and keep `expand_dns: true` — the tool resolves it to every pod IP and sums
+the counters across the fleet (reporting the delta over the run, plus a per-second
+interval rate). Example for a KServe/llm-d inference pool:
+
+```yaml
+vllm_metrics:
+  enabled: true
+  endpoints:
+    - https://qwen-tools-inference-pool-ip-XXXXXXXX.demo-llm.svc.cluster.local:8000/metrics
+  expand_dns: true       # resolve headless svc -> all pod IPs, scrape + sum each
+  poll_interval_s: 2.0
+```
+
+When scraping is active, the dashboard's cache hit rate and chart use the
+server-reported value and the "cached tokens" card switches to **hits / queries
+(N pods)**.
+
 > Tip: use more unique prompts than a single replica's cache comfortably holds
 > (e.g. 16–64) with enough users that each prompt is shared by several users.
 

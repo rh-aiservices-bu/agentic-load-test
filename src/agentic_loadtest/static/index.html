@@ -97,6 +97,21 @@
       Overrides the single preamble above.
     </div>
 
+    <details style="margin-top:12px">
+      <summary>vLLM metrics scrape (true KV cache hit rate)</summary>
+      <label><input type="checkbox" id="vm_enabled" style="width:auto" /> Scrape vLLM /metrics for prefix-cache hit rate</label>
+      <label>Metrics endpoints (one per line; a headless service host scrapes all pods)</label>
+      <textarea id="vm_endpoints" style="min-height:46px" placeholder="https://qwen-tools-inference-pool-ip-xxxx.demo-llm.svc.cluster.local:8000/metrics"></textarea>
+      <div class="row">
+        <div><label>Poll interval (s)</label><input id="vm_poll" type="number" step="0.5" min="0.5" /></div>
+        <div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="vm_expand" style="width:auto" checked /> expand DNS (all pods)</label></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:6px">
+        Use this when the model reports <code>prompt_tokens_details: null</code> (no per-request
+        cached_tokens). Reads <code>vllm:prefix_cache_hits_total/queries_total</code>.
+      </div>
+    </details>
+
     <h2 style="margin-top:18px">Load profile</h2>
     <div class="row">
       <div><label>Users</label><input id="num_users" type="number" /></div>
@@ -147,7 +162,7 @@
       <div class="card"><div class="v" id="c-tools">0</div><div class="l">Tool calls</div></div>
       <div class="card"><div class="v" id="c-lat">0</div><div class="l">Latency p95 (s)</div></div>
       <div class="card" style="border-color:var(--good)"><div class="v" id="c-cache" style="color:var(--good)">0%</div><div class="l">KV cache hit rate</div></div>
-      <div class="card"><div class="v" id="c-cached">0</div><div class="l">Cached tokens</div></div>
+      <div class="card"><div class="v" id="c-cached">0</div><div class="l" id="c-cached-l">Cached tokens</div></div>
     </div>
 
     <div class="charts">

@@ -16,10 +16,13 @@ const FIELDS = {
   sp_preamble: "system_prompt.preamble", sp_position: "system_prompt.position",
   num_unique_prompts: "prompt_pool.num_unique_prompts",
   prompt_tokens_target: "prompt_pool.prompt_tokens_target",
+  vm_enabled: "vllm_metrics.enabled", vm_poll: "vllm_metrics.poll_interval_s",
+  vm_expand: "vllm_metrics.expand_dns",
 };
 const NUMERIC = new Set(["temperature", "max_tokens", "num_users", "ramp_up_s", "duration_s",
   "iterations_per_user", "max_concurrent_requests", "think_time_min_ms", "think_time_max_ms",
-  "min_latency_ms", "max_latency_ms", "num_unique_prompts", "prompt_tokens_target"]);
+  "min_latency_ms", "max_latency_ms", "num_unique_prompts", "prompt_tokens_target",
+  "vm_poll"]);
 
 function getPath(obj, path) { return path.split(".").reduce((o, k) => o?.[k], obj); }
 function setPath(obj, path, val) {
@@ -34,6 +37,8 @@ function populate(cfg) {
     if (v === undefined) continue;
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
+  // Endpoints list -> textarea, one per line.
+  $("vm_endpoints").value = (getPath(cfg, "vllm_metrics.endpoints") || []).join("\n");
 }
 
 function collect() {
@@ -51,6 +56,9 @@ function collect() {
     if (!Number.isNaN(w)) weights[el.dataset.scn] = w;
   });
   cfg.scenario_weights = weights;
+  // Endpoints textarea -> array (split on newlines/commas, trim, drop blanks).
+  setPath(cfg, "vllm_metrics.endpoints",
+    $("vm_endpoints").value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean));
   return cfg;
 }
 
@@ -149,6 +157,7 @@ function initCharts() {
     { y: { beginAtZero: true, max: 1, ticks: { color: "#8b98a5" }, grid: { color: "#222c38" } } });
 }
 
+let serverCacheActive = false;
 const MAX_POINTS = 600;
 function pushPoint(p) {
   const t = p.t + "s";
@@ -163,7 +172,9 @@ function pushPoint(p) {
   push(charts.tokens, [p.prompt_tokens, p.completion_tokens, p.total_tokens]);
   push(charts.rate, [p.tokens_per_sec, p.requests_per_sec]);
   push(charts.ttft, [p.ttft_p50, p.ttft_p95]);
-  push(charts.cache, [p.cache_hit_rate ?? 0, p.cache_hit_rate_interval ?? 0]);
+  const cum = serverCacheActive ? (p.server_cache_hit_rate ?? 0) : (p.cache_hit_rate ?? 0);
+  const intv = serverCacheActive ? (p.server_cache_hit_rate_interval ?? 0) : (p.cache_hit_rate_interval ?? 0);
+  push(charts.cache, [cum, intv]);
 }
 
 function renderSnapshot(m, state) {
@@ -176,8 +187,18 @@ function renderSnapshot(m, state) {
   $("c-fail").textContent = fmt(m.requests_failed);
   $("c-tools").textContent = fmt(m.tool_calls);
   $("c-lat").textContent = m.latency.p95;
-  $("c-cache").textContent = ((m.cache_hit_rate ?? 0) * 100).toFixed(1) + "%";
-  $("c-cached").textContent = fmt(m.cached_tokens);
+  // Prefer the server-scraped prefix-cache hit rate when available; fall back to
+  // the per-request cached_tokens metric otherwise.
+  serverCacheActive = !!m.server_cache;
+  const cacheRate = serverCacheActive ? m.server_cache.hit_rate : (m.cache_hit_rate ?? 0);
+  $("c-cache").textContent = (cacheRate * 100).toFixed(1) + "%";
+  if (serverCacheActive) {
+    $("c-cached-l").textContent = `Cache hits / queries (${m.server_cache.targets} pods)`;
+    $("c-cached").textContent = `${fmt(m.server_cache.hits)} / ${fmt(m.server_cache.queries)}`;
+  } else {
+    $("c-cached-l").textContent = "Cached tokens";
+    $("c-cached").textContent = fmt(m.cached_tokens);
+  }
   $("elapsed").textContent = Math.round(m.elapsed_s) + "s";
 
   const sb = document.querySelector("#scn-table tbody"); sb.innerHTML = "";
@@ -209,6 +230,8 @@ function clearDashboard() {
   ["c-users", "c-tokens", "c-aptok", "c-tps", "c-ttft", "c-reqs", "c-fail",
    "c-tools", "c-lat", "c-cached"].forEach((id) => ($(id).textContent = "0"));
   $("c-cache").textContent = "0%";
+  serverCacheActive = false;
+  $("c-cached-l").textContent = "Cached tokens";
   $("elapsed").textContent = "0s";
   document.querySelector("#scn-table tbody").innerHTML = "";
   document.querySelector("#tool-table tbody").innerHTML = "";

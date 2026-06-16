@@ -64,6 +64,16 @@ class Metrics:
         self.cached_tokens: int = 0  # prefix-cache hits across all requests
         self.tool_calls: int = 0
 
+        # Server-reported prefix cache (scraped from vLLM /metrics). Counters are
+        # cumulative since pod start, so we record a baseline at the first scrape
+        # and report the delta over the run.
+        self.server_cache_hits: float = 0.0
+        self.server_cache_queries: float = 0.0
+        self.server_cache_targets: int = 0
+        self._cache_baseline: tuple[float, float] | None = None
+        self._last_sample_srv_hits: float = 0.0
+        self._last_sample_srv_queries: float = 0.0
+
         # Live gauges.
         self.active_users: int = 0
 
@@ -117,6 +127,24 @@ class Metrics:
         self.tool_call_counts[tool] += 1
         self.scenarios[scenario].tool_calls += 1
 
+    def set_server_cache(self, hits: float, queries: float, targets: int) -> None:
+        """Update fleet-wide prefix-cache counters scraped from vLLM /metrics."""
+        if self._cache_baseline is None:
+            self._cache_baseline = (hits, queries)
+            self._last_sample_srv_hits = hits
+            self._last_sample_srv_queries = queries
+        self.server_cache_hits = hits
+        self.server_cache_queries = queries
+        self.server_cache_targets = targets
+
+    def _server_cache_delta(self) -> tuple[float, float]:
+        if self._cache_baseline is None:
+            return (0.0, 0.0)
+        return (
+            self.server_cache_hits - self._cache_baseline[0],
+            self.server_cache_queries - self._cache_baseline[1],
+        )
+
     def scenario_started(self, scenario: str) -> None:
         self.scenarios[scenario].started += 1
 
@@ -139,6 +167,13 @@ class Metrics:
         d_cached = self.cached_tokens - self._last_sample_cached
         interval_hit = round(d_cached / d_prompt, 4) if d_prompt > 0 else 0.0
 
+        # Server-reported prefix-cache hit rate (run-cumulative and per-interval).
+        sh, sq = self._server_cache_delta()
+        srv_cum = round(sh / sq, 4) if sq > 0 else 0.0
+        d_sh = self.server_cache_hits - self._last_sample_srv_hits
+        d_sq = self.server_cache_queries - self._last_sample_srv_queries
+        srv_int = round(d_sh / d_sq, 4) if d_sq > 0 else 0.0
+
         point = {
             "t": round(now - self.start_time, 2),
             "total_tokens": total_tokens,
@@ -149,6 +184,8 @@ class Metrics:
             if self.prompt_tokens
             else 0.0,
             "cache_hit_rate_interval": interval_hit,
+            "server_cache_hit_rate": srv_cum,
+            "server_cache_hit_rate_interval": srv_int,
             "tokens_per_sec": round((total_tokens - self._last_sample_tokens) / dt, 1),
             "requests_per_sec": round((total_requests - self._last_sample_requests) / dt, 2),
             "active_users": self.active_users,
@@ -159,6 +196,8 @@ class Metrics:
         self._last_sample_requests = total_requests
         self._last_sample_prompt = self.prompt_tokens
         self._last_sample_cached = self.cached_tokens
+        self._last_sample_srv_hits = self.server_cache_hits
+        self._last_sample_srv_queries = self.server_cache_queries
         self._last_sample_t = now
         self.timeline.append(point)
         return point
@@ -212,4 +251,16 @@ class Metrics:
             },
             "tool_call_counts": dict(self.tool_call_counts),
             "errors": dict(self.errors),
+            "server_cache": self._server_cache_snapshot(),
+        }
+
+    def _server_cache_snapshot(self) -> dict | None:
+        if self._cache_baseline is None:
+            return None
+        sh, sq = self._server_cache_delta()
+        return {
+            "hit_rate": round(sh / sq, 4) if sq > 0 else 0.0,
+            "hits": int(sh),
+            "queries": int(sq),
+            "targets": self.server_cache_targets,
         }

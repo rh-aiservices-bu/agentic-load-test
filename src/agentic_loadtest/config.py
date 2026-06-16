@@ -100,6 +100,27 @@ class PromptPoolConfig(BaseModel):
     )
 
 
+class VLLMMetricsConfig(BaseModel):
+    """Scrape vLLM Prometheus /metrics for the true prefix-cache hit rate.
+
+    Needed because some vLLM builds don't report per-request ``cached_tokens``
+    in the OpenAI usage object, even while prefix caching is active. Point
+    ``endpoints`` at a headless service host (with ``expand_dns``) to aggregate
+    the counters across every replica.
+    """
+
+    enabled: bool = Field(default=False, description="Poll vLLM /metrics for prefix-cache stats.")
+    endpoints: list[str] = Field(
+        default_factory=list,
+        description="vLLM /metrics URLs, e.g. https://<headless-svc>:8000/metrics",
+    )
+    expand_dns: bool = Field(
+        default=True,
+        description="Resolve each endpoint host to all pod IPs (headless svc) and scrape each.",
+    )
+    poll_interval_s: float = Field(default=2.0, gt=0)
+
+
 class RunConfig(BaseModel):
     """Parameters of a single load-test run."""
 
@@ -107,6 +128,7 @@ class RunConfig(BaseModel):
     tool_sim: ToolSimConfig = Field(default_factory=ToolSimConfig)
     system_prompt: SystemPromptConfig = Field(default_factory=SystemPromptConfig)
     prompt_pool: PromptPoolConfig = Field(default_factory=PromptPoolConfig)
+    vllm_metrics: VLLMMetricsConfig = Field(default_factory=VLLMMetricsConfig)
 
     num_users: int = Field(default=10, ge=1, le=5000, description="Concurrent simulated users.")
     ramp_up_s: float = Field(default=5.0, ge=0, description="Spread user starts over this window.")
