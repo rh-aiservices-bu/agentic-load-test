@@ -198,6 +198,22 @@ function setState(state, running) {
   el.className = "pill " + state;
   $("btn-start").disabled = running;
   $("btn-stop").disabled = !running;
+  $("btn-reset").disabled = running;  // can only reset between runs
+}
+
+// Reset the dashboard view to zero: charts, stat cards, and breakdown tables.
+function clearDashboard() {
+  Object.values(charts).forEach((c) => {
+    c.data.labels = []; c.data.datasets.forEach((d) => (d.data = [])); c.update();
+  });
+  ["c-users", "c-tokens", "c-aptok", "c-tps", "c-ttft", "c-reqs", "c-fail",
+   "c-tools", "c-lat", "c-cached"].forEach((id) => ($(id).textContent = "0"));
+  $("c-cache").textContent = "0%";
+  $("elapsed").textContent = "0s";
+  document.querySelector("#scn-table tbody").innerHTML = "";
+  document.querySelector("#tool-table tbody").innerHTML = "";
+  updatePoolInfo();
+  lastT = -1;
 }
 
 // ───────── websocket ─────────
@@ -224,14 +240,19 @@ async function replayTimeline() {
 // ───────── actions ─────────
 $("btn-start").onclick = async () => {
   $("err").textContent = "";
-  Object.values(charts).forEach((c) => { c.data.labels = []; c.data.datasets.forEach((d) => d.data = []); c.update(); });
-  lastT = -1;
+  clearDashboard();
   const res = await fetch("/api/start", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collect()),
   });
   if (!res.ok) $("err").textContent = (await res.json()).error || "Failed to start";
 };
 $("btn-stop").onclick = () => fetch("/api/stop", { method: "POST" });
+$("btn-reset").onclick = async () => {
+  $("err").textContent = "";
+  const res = await fetch("/api/reset", { method: "POST" });
+  if (res.ok) clearDashboard();
+  else $("err").textContent = (await res.json()).error || "Failed to reset";
+};
 
 (async function init() {
   initCharts();

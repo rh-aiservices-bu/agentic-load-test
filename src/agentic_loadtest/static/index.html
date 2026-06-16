@@ -32,6 +32,7 @@
            font-weight:600; }
   .btn-start { background:var(--good); color:#03210c; }
   .btn-stop { background:var(--bad); color:#2b0606; }
+  .btn-reset { background:var(--panel2); color:var(--fg); border:1px solid var(--border); }
   button:disabled { opacity:.45; cursor:not-allowed; }
   .actions { display:flex; gap:8px; margin-top:16px; }
   .actions > button { flex:1; }
@@ -128,6 +129,7 @@
     <div class="actions">
       <button id="btn-start" class="btn-start">Start</button>
       <button id="btn-stop" class="btn-stop" disabled>Stop</button>
+      <button id="btn-reset" class="btn-reset" title="Clear metrics from the last run">Reset</button>
     </div>
     <div id="err" class="err"></div>
   </div>

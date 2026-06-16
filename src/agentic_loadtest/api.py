@@ -8,6 +8,7 @@ Endpoints
     GET  /api/timeline        full per-second timeline (for late-joining charts)
     POST /api/start           start a run with a RunConfig body
     POST /api/stop            stop the current run
+    POST /api/reset           clear metrics from the last run (when not running)
     WS   /ws                  pushes {snapshot, point} ~1/s while running
     GET  /                    the dashboard
 """
@@ -120,6 +121,14 @@ def create_app(settings: ServerSettings) -> FastAPI:
     async def stop() -> dict:
         await orch.stop()
         return {"state": orch.state.value}
+
+    @app.post("/api/reset")
+    async def reset() -> JSONResponse:
+        try:
+            orch.reset()
+        except RuntimeError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=409)
+        return JSONResponse({"state": orch.state.value})
 
     # ----- WebSocket ------------------------------------------------------
 

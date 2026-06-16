@@ -83,6 +83,19 @@ class Orchestrator:
         self.state = RunState.STOPPING
         self._stop.set()
 
+    def reset(self) -> None:
+        """Clear the metrics of the last run so the dashboard returns to zero.
+
+        Only allowed when no run is in progress; stop first otherwise.
+        """
+        if self.is_running:
+            raise RuntimeError("stop the run before resetting metrics")
+        self.metrics = None
+        self.config = None
+        self.prompt_pool = []
+        self.pool_info = {}
+        self.state = RunState.IDLE
+
     # ----- selection -------------------------------------------------------
 
     def _weighted_scenarios(self, cfg: RunConfig) -> tuple[list[Scenario], list[float]]:
